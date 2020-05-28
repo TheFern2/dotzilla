@@ -1,0 +1,18 @@
+; comments are ignored
+; paths here are in relation to home directory
+; paths can be directory or files
+.gitignore
+.bashrc
+.bash_aliases
+.zhrc
+.vimrc
+.tmux.config
+.emacs
+.emacs.el
+.emacs.d/init.el
+.config/nvim/init.vim
+.config/fish/config.fish
+.config/fish/fish_aliases
+.config/fish/.fish_aliases
+.config/fish/aliases.fish
+.config/test/test.conf
