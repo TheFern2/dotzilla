@@ -14,6 +14,8 @@ update_repo_script = ''
 user_paths = ''
 ignore_common_paths = False
 all_paths = []
+found_paths = []
+ignored_paths = []
 
 def copy_settings_file():
     if not os.path.isdir(settings_path):
@@ -22,6 +24,56 @@ def copy_settings_file():
     if not os.path.exists(settings_path + "settings.conf"):
         copyfile(dir_path + "/sample.settings.conf", settings_path + "settings.conf")
 
+
+# could be simplified, is working for now
+# user paths can have + for searching a path
+# a - for ignoring a path
+# and ; for comments
+# comments are processed here to be able to tell user of line errors
+def process_user_paths(paths):
+    for i in range(len(paths)):
+        if not paths[i].startswith(";"): # ignore comments
+            if paths[i].startswith("+"):
+                if "~" in paths[i][1]:
+                    all_paths.append(home_path + paths[i][2:-1] + "\n")
+                else:
+                    all_paths.append(paths[i][1:-1] + "\n")
+            if paths[i].startswith("-"):
+                if "~" in paths[i][1]:
+                    ignored_paths.append(home_path + paths[i][2:-1] + "\n")
+                else:
+                    ignored_paths.append(paths[i][1:-1] + "\n")
+            if not paths[i].startswith("+") and not paths[i].startswith("-"):
+                # this prob needs to be an exception
+                print('Error! Unknown modifier at Line ' + str(i) + " " + paths[i])
+
+
+# will scan system with given common paths
+# and user paths, but not ignored paths
+def find_dotfile(all_paths):
+    for path in all_paths:
+        if path not in ignored_paths:
+            if os.path.isfile(path.rstrip()):
+                found_paths.append(path.rstrip())
+                print('Found a file! ' + path, end='')
+                print('Link status ' + str(os.path.islink(path.rstrip())))
+                # os.path.realpath(path)
+                # create dotfile obj and save to pickle on links folder
+            if os.path.isdir(path.rstrip()):
+                found_paths.append(path.rstrip())
+                print('Found a dir!' + path, end='')
+
+
+# all dotfiles will be copied to a new folder inside the repo
+# with the default folder name
+# hostname + platform.system() + platform.release() + random 8 digit number
+# computer-01-Windows-XP-45677895
+# terminal-02-Linux-5.4.0-31-generic-32146548
+# if machine_name is provided:
+# machine_name = Ubuntu01_Work
+# Ubuntu01_Work-12354568
+def copy_dotfile_to_repo(repo_path, machine_name=None):
+    pass
 
 def scan_paths(user_paths=None, ignore_common_paths=False):
     if not ignore_common_paths:
@@ -35,23 +87,25 @@ def scan_paths(user_paths=None, ignore_common_paths=False):
     # ignore comments
     for line in common_lines:
         if not line.startswith(";"):
-            all_paths.append(line)
+            all_paths.append(home_path + "/" + line)
 
+    temp_paths = [] # need to clean this up here
     for line in user_lines:
-        if not line.startswith(";"):
-            all_paths.append(line)
+        temp_paths.append(line)
+    
+    process_user_paths(temp_paths)
 
-def print_log():
-    print(repo_path, "repo_path")
-    print(args.repo_path, "args.repo_path")
 
 # commands scan, backup, deploy, sync, path, name, settings
 # on first deploy dotzilla will look for a default dotfiles folder, if not it will list the current ones
 # and give user the option to rename or sync to same
 def main():
+        debug = False
+
         parser = argparse.ArgumentParser()
         parser.add_argument('--repo-path')
-        parser.add_argument('--scan', action='store_true')
+        parser.add_argument('--scan-only', action='store_true')
+        parser.add_argument('--backup', action='store_true')
         args = parser.parse_args()
 
         copy_settings_file() # only done once
@@ -65,22 +119,38 @@ def main():
         ignore_common_paths = config['DEFAULT'].getboolean('ignore_common_paths')
 
         # logging stuff
-        if True:
+        if debug:
             print(repo_path, "repo_path")
             print(args.repo_path, "args.repo_path")
             print(update_repo_script, "update_repo_script")
             print(user_paths, "user_paths")
             print(ignore_common_paths, "ignore_common_paths\n")
 
-        scan_paths("paths.txt")
-        print(len(all_paths))
-        for l in all_paths:
-            print(l, end='')
-
         # ask user for required values
         if not repo_path and not args.repo_path:
             print("Update settings.conf or run dotzilla with --repo-path flag")
             sys.exit()
+        
+        
+        scan_paths(user_paths, ignore_common_paths)
+
+        if debug:
+            print('All paths:')
+            print(len(all_paths))
+            for l in all_paths:
+                print(l, end='')
+
+            print('Ignored paths:')
+            print(len(ignored_paths))
+            for l in ignored_paths:
+                print(l, end='')
+
+        find_dotfile(all_paths)
+
+        # copy found_paths to repo_path
+        if args.backup and not args.scan_only:
+            pass
+
             
  
 if __name__ == '__main__':
