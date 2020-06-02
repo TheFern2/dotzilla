@@ -25,6 +25,20 @@ def copy_settings_file():
         copyfile(dir_path + "/sample.settings.conf", settings_path + "settings.conf")
 
 
+# common paths is a bit simpler
+# since we don't have starting identifiers
+def process_common_paths(paths):
+    for i in range(len(paths)):
+        if not paths[i].startswith(";"): # ignore comments
+            if paths[i].startswith("~"):
+                all_paths.append(home_path + paths[i][1:-1] + "\n")
+            else:
+                all_paths.append(paths[i] + "\n")
+
+            if not paths[i].startswith("~") and not paths[i].startswith("/"):
+                # this prob needs to be an exception
+                print('Error! Unknown modifier at Line ' + str(i + 1) + " " + paths[i])
+
 # could be simplified, is working for now
 # user paths can have + for searching a path
 # a - for ignoring a path
@@ -45,7 +59,7 @@ def process_user_paths(paths):
                     ignored_paths.append(paths[i][1:-1] + "\n")
             if not paths[i].startswith("+") and not paths[i].startswith("-"):
                 # this prob needs to be an exception
-                print('Error! Unknown modifier at Line ' + str(i) + " " + paths[i])
+                print('Error! Unknown modifier at Line ' + str(i + 1) + " " + paths[i])
 
 
 # will scan system with given common paths
@@ -55,13 +69,13 @@ def find_dotfile(all_paths):
         if path not in ignored_paths:
             if os.path.isfile(path.rstrip()):
                 found_paths.append(path.rstrip())
-                print('Found a file! ' + path, end='')
-                print('Link status ' + str(os.path.islink(path.rstrip())))
+                #print('Found a file! ' + path, end='')
+                #print('Link status ' + str(os.path.islink(path.rstrip())))
                 # os.path.realpath(path)
                 # create dotfile obj and save to pickle on links folder
             if os.path.isdir(path.rstrip()):
                 found_paths.append(path.rstrip())
-                print('Found a dir!' + path, end='')
+                #print('Found a dir!' + path, end='')
 
 
 # all dotfiles will be copied to a new folder inside the repo
@@ -75,6 +89,7 @@ def find_dotfile(all_paths):
 def copy_dotfile_to_repo(repo_path, machine_name=None):
     pass
 
+
 def scan_paths(user_paths=None, ignore_common_paths=False):
     if not ignore_common_paths:
         with open(dir_path + "/common_paths.txt", 'r') as f:
@@ -84,27 +99,21 @@ def scan_paths(user_paths=None, ignore_common_paths=False):
         with open(settings_path + user_paths, 'r') as f:
             user_lines = f.readlines()
 
-    # ignore comments
-    for line in common_lines:
-        if not line.startswith(";"):
-            all_paths.append(home_path + "/" + line)
-
-    temp_paths = [] # need to clean this up here
-    for line in user_lines:
-        temp_paths.append(line)
+    process_common_paths(common_lines)
     
-    process_user_paths(temp_paths)
+    process_user_paths(user_lines)
 
 
 # commands scan, backup, deploy, sync, path, name, settings
 # on first deploy dotzilla will look for a default dotfiles folder, if not it will list the current ones
 # and give user the option to rename or sync to same
 def main():
-        debug = False
+        debug = True
 
         parser = argparse.ArgumentParser()
         parser.add_argument('--repo-path')
         parser.add_argument('--scan-only', action='store_true')
+        parser.add_argument('--init', help='Initialize dotfiles' , action='store_true')
         parser.add_argument('--backup', action='store_true')
         args = parser.parse_args()
 
@@ -146,6 +155,18 @@ def main():
                 print(l, end='')
 
         find_dotfile(all_paths)
+
+        if args.scan_only:
+            for l in found_paths:
+                print(l)
+            os.sys.exit()
+
+        # init dotfiles, dotfiles found will be copied
+        # to repo, then symbolic links will be created to target
+        # repo files will be the source
+        # take into account linked files, and folders
+        if args.init:
+            pass
 
         # copy found_paths to repo_path
         if args.backup and not args.scan_only:
