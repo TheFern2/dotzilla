@@ -13,6 +13,7 @@ machine_name = ''
 update_repo_script = ''
 user_paths = ''
 ignore_common_paths = False
+common_paths_override = ''
 all_paths = []
 found_paths = []
 ignored_paths = []
@@ -76,6 +77,14 @@ def find_dotfile(all_paths):
             if os.path.isdir(path.rstrip()):
                 found_paths.append(path.rstrip())
                 #print('Found a dir!' + path, end='')
+            
+            # folder link returns false for isdir and isfile unlike
+            # linked file which still returns true for file
+            if not os.path.isfile(path.rstrip()) and os.path.islink(path.rstrip()):
+                #print('Link status ' + str(os.path.islink(path.rstrip())))
+                # os.path.realpath(path)
+                # create dotfile obj and save to pickle on links folder
+                found_paths.append(path.rstrip())
 
 
 # all dotfiles will be copied to a new folder inside the repo
@@ -90,10 +99,21 @@ def copy_dotfile_to_repo(repo_path, machine_name=None):
     pass
 
 
-def scan_paths(user_paths=None, ignore_common_paths=False):
+'''
+This function reads all paths which will used to scan machine for configs
+common paths are scanned by default, unless user choose not to and only use
+user paths. Common paths can be the default common paths file provided by
+dotzilla, or a user provided common paths in ~/.config/dotzilla/common_paths.txt
+'''
+def scan_paths(user_paths=None, override_common_paths=None,ignore_common_paths=False):
+    
     if not ignore_common_paths:
-        with open(dir_path + "/common_paths.txt", 'r') as f:
-            common_lines = f.readlines()
+        if override_common_paths:
+            with open(settings_path + override_common_paths, 'r') as f:
+                common_lines = f.readlines()
+        else:
+            with open(dir_path + "/common_paths.txt", 'r') as f:
+                common_lines = f.readlines()
 
     if user_paths:
         with open(settings_path + user_paths, 'r') as f:
@@ -108,7 +128,7 @@ def scan_paths(user_paths=None, ignore_common_paths=False):
 # on first deploy dotzilla will look for a default dotfiles folder, if not it will list the current ones
 # and give user the option to rename or sync to same
 def main():
-        debug = True
+        debug = False
 
         parser = argparse.ArgumentParser()
         parser.add_argument('--repo-path')
@@ -126,6 +146,7 @@ def main():
         machine_name = config['DEFAULT']['machine_name']
         user_paths = config['DEFAULT']['user_paths']
         ignore_common_paths = config['DEFAULT'].getboolean('ignore_common_paths')
+        common_paths_override = config['DEFAULT']['common_paths_override']
 
         # logging stuff
         if debug:
@@ -141,7 +162,7 @@ def main():
             sys.exit()
         
         
-        scan_paths(user_paths, ignore_common_paths)
+        scan_paths(user_paths, common_paths_override, ignore_common_paths)
 
         if debug:
             print('All paths:')
@@ -154,6 +175,8 @@ def main():
             for l in ignored_paths:
                 print(l, end='')
 
+        # TODO generate dotfile objects for links
+        # if is init, then pickled to repo
         find_dotfile(all_paths)
 
         if args.scan_only:
